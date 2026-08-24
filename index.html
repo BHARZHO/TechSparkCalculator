@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Calculator</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="calculator-container">
+        <!-- Top Navigation / Header Controls -->
+        <div class="calc-header">
+            <div class="mode-selector">
+                <button id="mode-std-btn" class="mode-btn active" title="Standard Mode">Standard</button>
+                <button id="mode-sci-btn" class="mode-btn" title="Scientific Mode">Scientific</button>
+            </div>
+
+            <div class="header-actions">
+                <button id="history-toggle-btn" class="icon-btn" title="History">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                </button>
+
+                <button id="theme-toggle-btn" class="icon-btn" title="Toggle Light/Dark Theme">
+                    <!-- Sun Icon (Light) -->
+                    <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <!-- Moon Icon (Dark) -->
+                    <svg class="moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Display Area -->
+        <div class="display-container">
+            <div class="indicators">
+                <span id="angle-indicator" class="badge">DEG</span>
+                <span id="memory-indicator" class="badge memory-badge hidden">M</span>
+            </div>
+            <div id="expression-display" class="expression-line"></div>
+            <input type="text" id="display" class="result-line" readonly value="0">
+        </div>
+
+        <!-- Secondary Functions & Memory Bar -->
+        <div class="function-bar">
+            <button id="btn-angle" class="fn-btn" title="Toggle Degrees/Radians">DEG</button>
+            <button id="btn-mc" class="fn-btn memory-btn" title="Memory Clear">MC</button>
+            <button id="btn-mr" class="fn-btn memory-btn" title="Memory Recall">MR</button>
+            <button id="btn-m-plus" class="fn-btn memory-btn" title="Memory Add">M+</button>
+            <button id="btn-m-minus" class="fn-btn memory-btn" title="Memory Subtract">M-</button>
+        </div>
+
+        <!-- Keypads Area -->
+        <div class="keypad-wrapper">
+
+            <!-- Scientific Controls (Visible in Scientific mode) -->
+            <div id="scientific-keypad" class="keypad scientific-keypad hidden">
+                <button data-action="func" data-value="sin(" class="btn sci-btn">sin</button>
+                <button data-action="func" data-value="cos(" class="btn sci-btn">cos</button>
+                <button data-action="func" data-value="tan(" class="btn sci-btn">tan</button>
+                <button data-action="func" data-value="asin(" class="btn sci-btn">asin</button>
+                
+                <button data-action="func" data-value="acos(" class="btn sci-btn">acos</button>
+                <button data-action="func" data-value="atan(" class="btn sci-btn">atan</button>
+                <button data-action="func" data-value="log(" class="btn sci-btn">log</button>
+                <button data-action="func" data-value="ln(" class="btn sci-btn">ln</button>
+                
+                <button data-action="op" data-value="^2" class="btn sci-btn">x²</button>
+                <button data-action="op" data-value="^3" class="btn sci-btn">x³</button>
+                <button data-action="op" data-value="^" class="btn sci-btn">xʸ</button>
+                <button data-action="func" data-value="sqrt(" class="btn sci-btn">√</button>
+
+                <button data-action="func" data-value="cbrt(" class="btn sci-btn">∛</button>
+
+                <button data-action="op" data-value="!" class="btn sci-btn">n!</button>
+                <button data-action="insert" data-value="π" class="btn sci-btn">π</button>
+                <button data-action="insert" data-value="e" class="btn sci-btn">e</button>
+            </div>
+
+            <!-- Standard Main Keypad -->
+            <div class="keypad standard-keypad">
+                <button id="clear" data-action="clear" class="btn action-btn danger-btn">C</button>
+                <button id="paren-open" data-action="insert" data-value="(" class="btn op-btn">(</button>
+                <button id="paren-close" data-action="insert" data-value=")" class="btn op-btn">)</button>
+                <button id="delete" data-action="delete" class="btn action-btn" title="Backspace">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path>
+                        <line x1="18" y1="9" x2="12" y2="15"></line>
+                        <line x1="12" y1="9" x2="18" y2="15"></line>
+                    </svg>
+                </button>
+
+                <button id="percent" data-action="insert" data-value="%" class="btn op-btn">%</button>
+                <button id="plus-minus" data-action="toggle-sign" class="btn op-btn">±</button>
+                <button id="reciprocal" data-action="func" data-value="1/(" class="btn op-btn">1/x</button>
+                <button id="divide" data-action="insert" data-value="÷" class="btn op-accent">÷</button>
+
+                <button id="seven" data-action="number" data-value="7" class="btn num-btn">7</button>
+                <button id="eight" data-action="number" data-value="8" class="btn num-btn">8</button>
+                <button id="nine" data-action="number" data-value="9" class="btn num-btn">9</button>
+                <button id="multiply" data-action="insert" data-value="×" class="btn op-accent">×</button>
+
+                <button id="four" data-action="number" data-value="4" class="btn num-btn">4</button>
+                <button id="five" data-action="number" data-value="5" class="btn num-btn">5</button>
+                <button id="six" data-action="number" data-value="6" class="btn num-btn">6</button>
+                <button id="minus" data-action="insert" data-value="−" class="btn op-accent">−</button>
+
+                <button id="one" data-action="number" data-value="1" class="btn num-btn">1</button>
+                <button id="two" data-action="number" data-value="2" class="btn num-btn">2</button>
+                <button id="three" data-action="number" data-value="3" class="btn num-btn">3</button>
+                <button id="plus" data-action="insert" data-value="+" class="btn op-accent">+</button>
+
+                <button id="zero" data-action="number" data-value="0" class="btn num-btn span-two">0</button>
+                <button id="decimal" data-action="insert" data-value="." class="btn num-btn">.</button>
+                <button id="equals" data-action="equals" class="btn equals-btn">=</button>
+            </div>
+        </div>
+
+        <!-- History Overlay Drawer -->
+        <div id="history-drawer" class="history-drawer">
+            <div class="history-header">
+                <h3>Calculation History</h3>
+                <div class="history-actions">
+                    <button id="clear-history-btn" class="text-btn" title="Clear History">Clear</button>
+                    <button id="close-history-btn" class="icon-btn-sm" title="Close Drawer">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="history-list" class="history-list">
+                <div class="empty-history">No history yet</div>
+            </div>
+        </div>
+
+        <!-- Drawer Overlay Backdrop -->
+        <div id="drawer-backdrop" class="drawer-backdrop"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
