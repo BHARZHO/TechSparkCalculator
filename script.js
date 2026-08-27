@@ -24,6 +24,7 @@ const elements = {
     scientificKeypad: document.getElementById("scientific-keypad"),
     btnHistoryToggle: document.getElementById("history-toggle-btn"),
     historyDrawer: document.getElementById("history-drawer"),
+    drawerBackdrop: document.getElementById("drawer-backdrop"),
     closeHistoryBtn: document.getElementById("close-history-btn"),
     clearHistoryBtn: document.getElementById("clear-history-btn"),
     historyList: document.getElementById("history-list")
@@ -71,83 +72,177 @@ function toggleAngleUnit() {
     state.angleUnit = state.angleUnit === "DEG" ? "RAD" : "DEG";
     elements.angleIndicator.textContent = state.angleUnit;
     elements.btnAngle.textContent = state.angleUnit;
+    // Refresh live evaluation if any
+    updateDisplay();
 }
 
 // Factorial Helper
 function factorial(n) {
-    if (n < 0) return NaN;
+    if (n < 0 || !Number.isInteger(n)) return NaN;
     if (n === 0 || n === 1) return 1;
+    if (n > 170) return Infinity;
     let res = 1;
-    for (let i = 2; i <= Math.min(n, 170); i++) res *= i;
+    for (let i = 2; i <= n; i++) res *= i;
     return res;
+}
+
+// Format numbers nicely without floating point glitches (e.g. 0.1 + 0.2 = 0.3)
+function formatResult(val) {
+    if (typeof val !== "number") return "Error";
+    if (isNaN(val)) return "Invalid format";
+    if (!isFinite(val)) return "Cannot divide by 0";
+
+    // Near zero cleanup for trigonometry (e.g. cos(90 deg))
+    if (Math.abs(val) < 1e-14 && Math.abs(val) > 0) {
+        val = 0;
+    }
+
+    // Convert with high precision and strip trailing zeros
+    const rounded = parseFloat(val.toPrecision(12));
+    const str = rounded.toString();
+
+    // Check if result is exponentially large or small
+    if (Math.abs(rounded) >= 1e14 || (Math.abs(rounded) > 0 && Math.abs(rounded) < 1e-6)) {
+        return rounded.toExponential(6).replace(/\.?0+e/, "e");
+    }
+
+    return str;
+}
+
+// Preprocess and Sanitize Expression String for Safe Evaluation
+function sanitizeExpression(exprStr) {
+    if (!exprStr || !exprStr.trim()) return "";
+
+    let san = exprStr.trim();
+
+    // Standardize unicode symbols
+    san = san
+        .replace(/×/g, "*")
+        .replace(/÷/g, "/")
+        .replace(/−/g, "-")
+        .replace(/π/g, "Math.PI")
+        .replace(/e/g, "Math.E");
+
+    // Remove trailing incomplete operators
+    san = san.replace(/[\+\-\*\/^\s]+$/, "");
+
+    // Contextual Percentage Handling:
+    // Case 1: A + B% => A + (A * (B / 100))
+    // Case 2: A - B% => A - (A * (B / 100))
+    // Case 3: A * B% or A / B% => A * (B / 100)
+    // Case 4: Standalone B% => (B / 100)
+    san = san.replace(/(\d+(\.\d+)?)\s*([\+\-])\s*(\d+(\.\d+)?)%/g, "($1 $3 ($1 * $4 * 0.01))");
+    san = san.replace(/(\d+(\.\d+)?)\s*([\*\/])\s*(\d+(\.\d+)?)%/g, "($1 $3 ($4 * 0.01))");
+    san = san.replace(/(\d+(\.\d+)?)%/g, "($1 * 0.01)");
+    san = san.replace(/\)%/g, ") * 0.01");
+
+    // Handle powers: x^2, x^3, x^y
+    san = san.replace(/\^2/g, "**2");
+    san = san.replace(/\^3/g, "**3");
+    san = san.replace(/\^/g, "**");
+
+    // Handle factorials: e.g. 5! or (3+2)!
+    san = san.replace(/(\d+(\.\d+)?|\([^\(\)]+\))!/g, "factorial($1)");
+
+    // Insert implicit multiplications:
+    // e.g. 5(2) -> 5*(2), (2)(3) -> (2)*(3), 5Math.PI -> 5*Math.PI
+    san = san.replace(/(\d|\))\s*(Math\.PI|Math\.E)/g, "$1*$2");
+    san = san.replace(/(Math\.PI|Math\.E)\s*(\d|\()/g, "$1*$2");
+    san = san.replace(/(\d)\s*\(/g, "$1*(");
+    san = san.replace(/\)\s*(\d)/g, ")*$1");
+    san = san.replace(/\)\s*\(/g, ")*(");
+
+    // Implicit multiplication before functions: e.g. 5sin( -> 5*sin(
+    san = san.replace(/(\d|\))\s*(sin|cos|tan|asin|acos|atan|log|ln|sqrt|cbrt)\(/g, "$1*$2(");
+
+    // Auto-close open parentheses
+    let openCount = (san.match(/\(/g) || []).length;
+    let closeCount = (san.match(/\)/g) || []).length;
+    while (openCount > closeCount) {
+        san += ")";
+        closeCount++;
+    }
+
+    // Trigonometric and Math functions setup
+    san = san.replace(/asin\(/g, "asinFn(");
+    san = san.replace(/acos\(/g, "acosFn(");
+    san = san.replace(/atan\(/g, "atanFn(");
+    san = san.replace(/sin\(/g, "sinFn(");
+    san = san.replace(/cos\(/g, "cosFn(");
+    san = san.replace(/tan\(/g, "tanFn(");
+    san = san.replace(/log\(/g, "logFn(");
+    san = san.replace(/ln\(/g, "lnFn(");
+    san = san.replace(/sqrt\(/g, "sqrtFn(");
+    san = san.replace(/cbrt\(/g, "cbrtFn(");
+
+    return san;
 }
 
 // Safe Mathematical Evaluator
 function evaluateExpression(exprStr) {
-    if (!exprStr.trim()) return "0";
+    if (!exprStr || !exprStr.trim()) return "0";
+
+    const san = sanitizeExpression(exprStr);
+    if (!san) return "0";
 
     try {
-        let san = exprStr
-            .replace(/×/g, "*")
-            .replace(/÷/g, "/")
-            .replace(/−/g, "-")
-            .replace(/π/g, "Math.PI")
-            .replace(/e/g, "Math.E")
-            .replace(/%/g, "*0.01");
-
-        // Handle powers like x^y
-        san = san.replace(/(\d+(\.\d+)?)\^(\d+(\.\d+)?)/g, "Math.pow($1,$3)");
-
-        // Handle square & cube exponents
-        san = san.replace(/\^2/g, "**2");
-        san = san.replace(/\^3/g, "**3");
-
-        // Handle factorials (e.g. 5!)
-        san = san.replace(/(\d+)!/g, "factorial($1)");
-
-        // Trigonometric Functions setup according to DEG/RAD
         const isDeg = state.angleUnit === "DEG";
-        const sinFn = (x) => Math.sin(isDeg ? (x * Math.PI) / 180 : x);
-        const cosFn = (x) => Math.cos(isDeg ? (x * Math.PI) / 180 : x);
-        const tanFn = (x) => Math.tan(isDeg ? (x * Math.PI) / 180 : x);
-        const asinFn = (x) => (isDeg ? (Math.asin(x) * 180) / Math.PI : Math.asin(x));
-        const acosFn = (x) => (isDeg ? (Math.acos(x) * 180) / Math.PI : Math.acos(x));
-        const atanFn = (x) => (isDeg ? (Math.atan(x) * 180) / Math.PI : Math.atan(x));
-        const logFn = (x) => Math.log10(x);
-        const lnFn = (x) => Math.log(x);
-        const sqrtFn = (x) => Math.sqrt(x);
+        const degToRad = (deg) => (deg * Math.PI) / 180;
+        const radToDeg = (rad) => (rad * 180) / Math.PI;
+
+        const sinFn = (x) => {
+            if (isDeg) {
+                const norm = ((x % 360) + 360) % 360;
+                if (norm === 0 || norm === 180) return 0;
+                if (norm === 90) return 1;
+                if (norm === 270) return -1;
+                return Math.sin(degToRad(x));
+            }
+            return Math.sin(x);
+        };
+
+        const cosFn = (x) => {
+            if (isDeg) {
+                const norm = ((x % 360) + 360) % 360;
+                if (norm === 90 || norm === 270) return 0;
+                if (norm === 0) return 1;
+                if (norm === 180) return -1;
+                return Math.cos(degToRad(x));
+            }
+            return Math.cos(x);
+        };
+
+        const tanFn = (x) => {
+            if (isDeg) {
+                const norm = ((x % 360) + 360) % 360;
+                if (norm === 90 || norm === 270) return NaN;
+                if (norm === 0 || norm === 180) return 0;
+                if (norm === 45 || norm === 225) return 1;
+                return Math.tan(degToRad(x));
+            }
+            return Math.tan(x);
+        };
+
+        const asinFn = (x) => (isDeg ? radToDeg(Math.asin(x)) : Math.asin(x));
+        const acosFn = (x) => (isDeg ? radToDeg(Math.acos(x)) : Math.acos(x));
+        const atanFn = (x) => (isDeg ? radToDeg(Math.atan(x)) : Math.atan(x));
+        const logFn = (x) => (x <= 0 ? NaN : Math.log10(x));
+        const lnFn = (x) => (x <= 0 ? NaN : Math.log(x));
+        const sqrtFn = (x) => (x < 0 ? NaN : Math.sqrt(x));
         const cbrtFn = (x) => Math.cbrt(x);
 
-        // Replace trigonometric string tokens
-        san = san.replace(/asin\(/g, "asinFn(");
-        san = san.replace(/acos\(/g, "acosFn(");
-        san = san.replace(/atan\(/g, "atanFn(");
-        san = san.replace(/sin\(/g, "sinFn(");
-        san = san.replace(/cos\(/g, "cosFn(");
-        san = san.replace(/tan\(/g, "tanFn(");
-        san = san.replace(/log\(/g, "logFn(");
-        san = san.replace(/ln\(/g, "lnFn(");
-        san = san.replace(/sqrt\(/g, "sqrtFn(");
-        san = san.replace(/cbrt\(/g, "cbrtFn(");
-
-        // Create scope with math functions
         const evaluator = new Function(
             "sinFn", "cosFn", "tanFn", "asinFn", "acosFn", "atanFn",
             "logFn", "lnFn", "sqrtFn", "cbrtFn", "factorial",
-            `return ${san};`
+            `"use strict"; return (${san});`
         );
 
-        let val = evaluator(
+        const val = evaluator(
             sinFn, cosFn, tanFn, asinFn, acosFn, atanFn,
             logFn, lnFn, sqrtFn, cbrtFn, factorial
         );
 
-        if (typeof val === "number") {
-            if (!isFinite(val)) return "Error";
-            // Clean up float rounding issues like 0.1 + 0.2
-            return Number(Math.round(val + "e12") + "e-12").toString();
-        }
-        return "Error";
+        return formatResult(val);
     } catch (e) {
         return "Error";
     }
@@ -164,34 +259,179 @@ function updateDisplay() {
     } else {
         // Real-time live evaluation preview
         const liveResult = evaluateExpression(state.expression);
-        if (liveResult !== "Error" && liveResult !== "") {
+        if (liveResult !== "Error" && liveResult !== "Invalid format" && liveResult !== "Cannot divide by 0" && liveResult !== "") {
             elements.resultDisplay.value = liveResult;
         }
     }
 }
 
+// Helper: Get the current number token at the end of expression
+function getCurrentNumberToken() {
+    const parts = state.expression.split(/[\+\−\-\×\*\÷\/\^\(\)]/);
+    return parts[parts.length - 1] || "";
+}
+
+// Helper: Check if string ends with an operator
+function isLastCharOperator() {
+    const trimmed = state.expression.trim();
+    if (!trimmed) return false;
+    const lastChar = trimmed.slice(-1);
+    return ["+", "−", "-", "×", "*", "÷", "/", "^"].includes(lastChar);
+}
+
 // User Actions Handler
 function handleInput(action, value) {
+    // Handling actions when a calculation was previously evaluated
     if (state.isEvaluated && action !== "equals") {
-        if (action === "number" || action === "insert" || action === "func") {
-            // Start fresh if user presses number/func after result evaluation
+        if (action === "number" || action === "func" || action === "constant") {
+            // New calculation start
             state.expression = "";
+        } else if (action === "decimal") {
+            state.expression = "0";
+        } else if (action === "op" || action === "percent") {
+            // Chaining previous result!
+            if (state.result !== "Error" && state.result !== "Cannot divide by 0" && state.result !== "Invalid format") {
+                state.expression = state.result;
+            } else {
+                state.expression = "0";
+            }
         }
         state.isEvaluated = false;
     }
 
     switch (action) {
         case "number":
-        case "insert":
-            state.expression += value;
+            // Avoid leading multiple zeros like "00"
+            if (state.expression === "0" && value !== ".") {
+                state.expression = value;
+            } else {
+                state.expression += value;
+            }
             break;
 
-        case "func":
-            state.expression += value;
+        case "constant":
+            if (state.expression === "0") {
+                state.expression = value;
+            } else {
+                state.expression += value;
+            }
+            break;
+
+        case "decimal":
+            const currentToken = getCurrentNumberToken();
+            if (!currentToken.includes(".")) {
+                if (currentToken === "" || isLastCharOperator() || state.expression.endsWith("(") || state.expression === "") {
+                    state.expression += "0.";
+                } else {
+                    state.expression += ".";
+                }
+            }
             break;
 
         case "op":
-            state.expression += value;
+            if (state.expression === "") {
+                if (value === "−" || value === "-") {
+                    state.expression = "−";
+                } else {
+                    state.expression = "0 " + value + " ";
+                }
+            } else if (isLastCharOperator()) {
+                // Replace the previous trailing operator cleanly
+                const trimmed = state.expression.trim();
+                const withoutLastOp = trimmed.slice(0, -1).trim();
+                if (value === "−" && !trimmed.endsWith("−") && (trimmed.endsWith("×") || trimmed.endsWith("÷"))) {
+                    // Allow negative sign after multiply or divide (e.g. 5 × −2)
+                    state.expression = trimmed + " −";
+                } else {
+                    state.expression = withoutLastOp ? withoutLastOp + " " + value + " " : value === "−" ? "−" : "0 " + value + " ";
+                }
+            } else {
+                state.expression += " " + value + " ";
+            }
+            break;
+
+        case "percent":
+            if (state.expression !== "" && !isLastCharOperator()) {
+                state.expression += "%";
+            }
+            break;
+
+        case "paren":
+            if (value === "(") {
+                if (state.expression === "0") {
+                    state.expression = "(";
+                } else {
+                    state.expression += "(";
+                }
+            } else {
+                const openCount = (state.expression.match(/\(/g) || []).length;
+                const closeCount = (state.expression.match(/\)/g) || []).length;
+                if (openCount > closeCount && !isLastCharOperator()) {
+                    state.expression += ")";
+                }
+            }
+            break;
+
+        case "func":
+            if (state.expression === "0") {
+                state.expression = value;
+            } else {
+                state.expression += value;
+            }
+            break;
+
+        case "reciprocal":
+            if (state.isEvaluated && state.result !== "Error") {
+                state.expression = `1/(${state.result})`;
+            } else if (state.expression.trim()) {
+                state.expression = `1/(${state.expression.trim()})`;
+            } else {
+                state.expression = "1/(";
+            }
+            break;
+
+        case "toggle-sign":
+            if (state.isEvaluated && state.result !== "Error") {
+                if (state.result.startsWith("-") || state.result.startsWith("−")) {
+                    state.result = state.result.slice(1);
+                } else if (state.result !== "0") {
+                    state.result = "−" + state.result;
+                }
+                state.expression = state.result;
+            } else {
+                const parts = state.expression.split(" ");
+                const last = parts[parts.length - 1];
+                if (last) {
+                    if (last.startsWith("−") || last.startsWith("-")) {
+                        parts[parts.length - 1] = last.slice(1);
+                    } else if (last !== "0" && last !== "") {
+                        parts[parts.length - 1] = "−" + last;
+                    }
+                    state.expression = parts.join(" ");
+                } else {
+                    state.expression = "−";
+                }
+            }
+            break;
+
+        case "delete":
+            if (state.isEvaluated) {
+                state.expression = "";
+                state.result = "0";
+                state.isEvaluated = false;
+            } else if (state.expression.length > 0) {
+                // Check if deleting a multi-char token like 'sin(', 'sqrt(', 'log(', etc.
+                const funcMatches = ["asin(", "acos(", "atan(", "cbrt(", "sqrt(", "sin(", "cos(", "tan(", "log(", "ln(", "1/("];
+                let matchedFunc = funcMatches.find(fn => state.expression.endsWith(fn));
+                if (matchedFunc) {
+                    state.expression = state.expression.slice(0, -matchedFunc.length);
+                } else if (state.expression.endsWith(" ")) {
+                    // Remove trailing spaced operator
+                    state.expression = state.expression.trimEnd().slice(0, -1).trimEnd();
+                } else {
+                    state.expression = state.expression.slice(0, -1);
+                }
+            }
             break;
 
         case "clear":
@@ -200,30 +440,13 @@ function handleInput(action, value) {
             state.isEvaluated = false;
             break;
 
-        case "delete":
-            if (state.expression.length > 0) {
-                state.expression = state.expression.slice(0, -1);
-            }
-            break;
-
-        case "toggle-sign":
-            if (state.expression.startsWith("-")) {
-                state.expression = state.expression.slice(1);
-            } else {
-                state.expression = "-" + state.expression;
-            }
-            break;
-
         case "equals":
             if (!state.expression.trim()) return;
             const finalResult = evaluateExpression(state.expression);
-            if (finalResult !== "Error") {
-                state.result = finalResult;
-                state.isEvaluated = true;
+            state.result = finalResult;
+            state.isEvaluated = true;
+            if (finalResult !== "Error" && finalResult !== "Cannot divide by 0" && finalResult !== "Invalid format") {
                 saveHistory(state.expression, finalResult);
-            } else {
-                state.result = "Error";
-                state.isEvaluated = true;
             }
             break;
     }
@@ -233,14 +456,25 @@ function handleInput(action, value) {
 
 // Memory Operations
 function handleMemory(type) {
-    const currentVal = parseFloat(elements.resultDisplay.value) || 0;
+    let currentVal = 0;
+    if (state.isEvaluated) {
+        currentVal = parseFloat(state.result) || 0;
+    } else {
+        const evalVal = evaluateExpression(state.expression);
+        currentVal = parseFloat(evalVal) || 0;
+    }
+
     switch (type) {
         case "mc":
             state.memory = 0;
             break;
         case "mr":
-            state.expression += state.memory.toString();
-            state.isEvaluated = false;
+            if (state.isEvaluated) {
+                state.expression = state.memory.toString();
+                state.isEvaluated = false;
+            } else {
+                state.expression += state.memory.toString();
+            }
             break;
         case "m-plus":
             state.memory += currentVal;
@@ -308,12 +542,13 @@ function clearHistory() {
 }
 
 function toggleHistoryDrawer(open) {
-    if (open === undefined) {
-        elements.historyDrawer.classList.toggle("open");
-    } else if (open) {
+    const isOpen = open !== undefined ? open : !elements.historyDrawer.classList.contains("open");
+    if (isOpen) {
         elements.historyDrawer.classList.add("open");
+        if (elements.drawerBackdrop) elements.drawerBackdrop.classList.add("active");
     } else {
         elements.historyDrawer.classList.remove("open");
+        if (elements.drawerBackdrop) elements.drawerBackdrop.classList.remove("active");
     }
 }
 
@@ -342,6 +577,9 @@ function setupEventListeners() {
     // History Toggle & Actions
     elements.btnHistoryToggle.addEventListener("click", () => toggleHistoryDrawer());
     elements.closeHistoryBtn.addEventListener("click", () => toggleHistoryDrawer(false));
+    if (elements.drawerBackdrop) {
+        elements.drawerBackdrop.addEventListener("click", () => toggleHistoryDrawer(false));
+    }
     elements.clearHistoryBtn.addEventListener("click", clearHistory);
 
     // Click Delegation on Calculator Keypads
@@ -369,20 +607,20 @@ function setupEventListeners() {
         if (key >= "0" && key <= "9") {
             handleInput("number", key);
         } else if (key === ".") {
-            handleInput("insert", ".");
+            handleInput("decimal", ".");
         } else if (key === "+") {
-            handleInput("insert", "+");
+            handleInput("op", "+");
         } else if (key === "-") {
-            handleInput("insert", "−");
+            handleInput("op", "−");
         } else if (key === "*") {
-            handleInput("insert", "×");
+            handleInput("op", "×");
         } else if (key === "/") {
             e.preventDefault();
-            handleInput("insert", "÷");
+            handleInput("op", "÷");
         } else if (key === "%") {
-            handleInput("insert", "%");
+            handleInput("percent", "%");
         } else if (key === "(" || key === ")") {
-            handleInput("insert", key);
+            handleInput("paren", key);
         } else if (key === "^") {
             handleInput("op", "^");
         } else if (key === "Enter" || key === "=") {
@@ -390,7 +628,7 @@ function setupEventListeners() {
             handleInput("equals");
         } else if (key === "Backspace") {
             handleInput("delete");
-        } else if (key === "Escape" || key === "c" || key === "C") {
+        } else if (key === "Escape" || key.toLowerCase() === "c") {
             handleInput("clear");
         }
     });
@@ -410,6 +648,9 @@ function highlightButton(key) {
     else if (key === "Backspace") selector = "#delete";
     else if (key === "Escape" || key.toLowerCase() === "c") selector = "#clear";
     else if (key === ".") selector = "#decimal";
+    else if (key === "%") selector = "#percent";
+    else if (key === "(") selector = "#paren-open";
+    else if (key === ")") selector = "#paren-close";
 
     if (selector) {
         const btn = document.querySelector(selector);

@@ -91,15 +91,15 @@
                 <button data-action="func" data-value="cbrt(" class="btn sci-btn">∛</button>
 
                 <button data-action="op" data-value="!" class="btn sci-btn">n!</button>
-                <button data-action="insert" data-value="π" class="btn sci-btn">π</button>
-                <button data-action="insert" data-value="e" class="btn sci-btn">e</button>
+                <button data-action="constant" data-value="π" class="btn sci-btn">π</button>
+                <button data-action="constant" data-value="e" class="btn sci-btn">e</button>
             </div>
 
             <!-- Standard Main Keypad -->
             <div class="keypad standard-keypad">
                 <button id="clear" data-action="clear" class="btn action-btn danger-btn">C</button>
-                <button id="paren-open" data-action="insert" data-value="(" class="btn op-btn">(</button>
-                <button id="paren-close" data-action="insert" data-value=")" class="btn op-btn">)</button>
+                <button id="paren-open" data-action="paren" data-value="(" class="btn op-btn">(</button>
+                <button id="paren-close" data-action="paren" data-value=")" class="btn op-btn">)</button>
                 <button id="delete" data-action="delete" class="btn action-btn" title="Backspace">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path>
@@ -108,28 +108,28 @@
                     </svg>
                 </button>
 
-                <button id="percent" data-action="insert" data-value="%" class="btn op-btn">%</button>
+                <button id="percent" data-action="percent" data-value="%" class="btn op-btn">%</button>
                 <button id="plus-minus" data-action="toggle-sign" class="btn op-btn">±</button>
-                <button id="reciprocal" data-action="func" data-value="1/(" class="btn op-btn">1/x</button>
-                <button id="divide" data-action="insert" data-value="÷" class="btn op-accent">÷</button>
+                <button id="reciprocal" data-action="reciprocal" class="btn op-btn">1/x</button>
+                <button id="divide" data-action="op" data-value="÷" class="btn op-accent">÷</button>
 
                 <button id="seven" data-action="number" data-value="7" class="btn num-btn">7</button>
                 <button id="eight" data-action="number" data-value="8" class="btn num-btn">8</button>
                 <button id="nine" data-action="number" data-value="9" class="btn num-btn">9</button>
-                <button id="multiply" data-action="insert" data-value="×" class="btn op-accent">×</button>
+                <button id="multiply" data-action="op" data-value="×" class="btn op-accent">×</button>
 
                 <button id="four" data-action="number" data-value="4" class="btn num-btn">4</button>
                 <button id="five" data-action="number" data-value="5" class="btn num-btn">5</button>
                 <button id="six" data-action="number" data-value="6" class="btn num-btn">6</button>
-                <button id="minus" data-action="insert" data-value="−" class="btn op-accent">−</button>
+                <button id="minus" data-action="op" data-value="−" class="btn op-accent">−</button>
 
                 <button id="one" data-action="number" data-value="1" class="btn num-btn">1</button>
                 <button id="two" data-action="number" data-value="2" class="btn num-btn">2</button>
                 <button id="three" data-action="number" data-value="3" class="btn num-btn">3</button>
-                <button id="plus" data-action="insert" data-value="+" class="btn op-accent">+</button>
+                <button id="plus" data-action="op" data-value="+" class="btn op-accent">+</button>
 
                 <button id="zero" data-action="number" data-value="0" class="btn num-btn span-two">0</button>
-                <button id="decimal" data-action="insert" data-value="." class="btn num-btn">.</button>
+                <button id="decimal" data-action="decimal" data-value="." class="btn num-btn">.</button>
                 <button id="equals" data-action="equals" class="btn equals-btn">=</button>
             </div>
         </div>
